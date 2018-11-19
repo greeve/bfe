@@ -245,7 +245,7 @@ bfe.define('src/bfe', ['require', 'exports', 'src/bfestore', 'src/bfelogging', '
                       </div>');
 /* eslint-disable no-unused-vars */
       if (!$.fn.dataTable.isDataTable('#table_id')) {
-        var $datatable = $('<table id="table_id" class="display"><thead><tr><th>id</th><th>name</th><th>title</th><th>LCCN</th><th>comment</th><th>modified</th><th>edit</th></tr></thead></table>');
+        var $datatable = $('<table id="table_id" class="display"><thead><tr><th>id</th><th>title</th><th>LCCN</th><th>profile</th><th>modified</th><th>edit</th></tr></thead></table>');
         $(function () {
           $('#table_id').DataTable({
             'initComplete': function (settings, json) {
@@ -276,12 +276,14 @@ bfe.define('src/bfe', ['require', 'exports', 'src/bfestore', 'src/bfelogging', '
                 'Access-Control-Max-Age': '1728000'
               }
             },
+            
+            "order": [[ 4, "desc" ]],
             // id
             'columns': [{
-              'data': 'id'
-            },
+            //  'data': 'id'
+            //},
             // name
-            {
+            //{
               'data': 'name',
               'render': function (data, type, full, meta) {
                 try {
@@ -397,15 +399,17 @@ bfe.define('src/bfe', ['require', 'exports', 'src/bfestore', 'src/bfelogging', '
                 return text;
               }
             },
-            //comment
+            //profile
             {
               'data': 'rdf',
+              'width': '10%',
               'render': function (data, type, full, meta) {
                 var text = '';
                 var mahttp = _.findKey(data, 'http://id.loc.gov/ontologies/bflc/metadataAssigner');
                 var mahttps = _.findKey(data, 'https://id.loc.gov/ontologies/bflc/metadataAssigner');
                 var cihttp = _.findKey(data, 'http://id.loc.gov/ontologies/bflc/catalogerId');
                 var cihttps = _.findKey(data, 'https://id.loc.gov/ontologies/bflc/catalogerId');
+                var profile = full.profile;
                 if (mahttps) {
                   text = _.pluck(data[mahttps]['https://id.loc.gov/ontologies/bflc/metadataAssigner'], '@value')[0];
                 } else if (mahttp) {
@@ -414,6 +418,11 @@ bfe.define('src/bfe', ['require', 'exports', 'src/bfestore', 'src/bfelogging', '
                   text = _.pluck(data[cihttps]['https://id.loc.gov/ontologies/bflc/catalogerId'], '@value')[0];
                 } else if (cihttp) {
                   text = _.pluck(data[cihttp]['http://id.loc.gov/ontologies/bflc/catalogerId'], '@value')[0];
+                } else if (profile) {
+                  profile = profile.replace(":Instance", "");
+                  profile = profile.replace(":Work", "");
+                  _.where(bfeditor.profiles, function (o) { if (o.Profile.id === profile) text = o.Profile.title.replace("BIBFRAME 2.0 ", "") })
+
                 }
                 //                                if (_.filter(data, function(el) {
                 //                                        return el["http://id.loc.gov/ontologies/bflc/metadataAssigner"]
@@ -429,20 +438,7 @@ bfe.define('src/bfe', ['require', 'exports', 'src/bfestore', 'src/bfelogging', '
               'data': 'modified',
               'width': '10%',
               'render': function (data, type, row) {
-                var d = new Date(data);
-                // Month first
-  
-                var hr = d.getHours();
-                var min = d.getMinutes();
-                var ampm = 'a';
-                if (min < 10) { min = '0' + min; }
-                if (hr >= 12) {
-                  ampm = 'p';
-                }
-                if (hr > 12) {
-                  hr -= 12;
-                }
-                return (d.getMonth() + 1) + '-' + d.getDate() + '-' + d.getFullYear() + ' ' + hr + ':' + min + ampm;
+                return moment(data).format("M-DD-YYYY h:mm a");
               }
             },
             //edit
@@ -455,8 +451,8 @@ bfe.define('src/bfe', ['require', 'exports', 'src/bfestore', 'src/bfelogging', '
               'render': function (td, cellData, rowData, row) {
                 //             return '<a href="'+data+'">edit</a>';
   
-                return '<div class="btn-group" id="retrieve-btn"><button id="bfeditor-retrieve' + rowData.id + '" type="button" class="btn btn-default">Edit</button> \
-                               <button id="bfeditor-delete' + rowData.id + '"type="button" class="btn btn-danger" data-toggle="modal" data-target="#bfeditor-deleteConfirm' + rowData.id + '">Delete</button> \
+                return '<div class="btn-group" id="retrieve-btn"><button id="bfeditor-retrieve' + rowData.id + '" type="button" class="btn btn-default"><span class="glyphicon glyphicon-pencil"></button> \
+                               <button id="bfeditor-delete' + rowData.id + '"type="button" class="btn btn-danger" data-toggle="modal" data-target="#bfeditor-deleteConfirm' + rowData.id + '"><span class="glyphicon glyphicon-trash"></button> \
                                </div>';
               },
               'createdCell': function (td, cellData, rowData, row, col) {
@@ -2895,7 +2891,8 @@ bfe.define('src/bfe', ['require', 'exports', 'src/bfestore', 'src/bfelogging', '
   
           // Kirk note, at this point, some resources have a URI and others have a blank node that matches the defaulturi.
   
-          setResourceFromModal(callingformobjectid, form.formobject.id, resourceURI, inputID, form.formobject.store);
+//          setResourceFromModal(callingformobjectid, form.formobject.id, resourceURI, inputID, form.formobject.store);
+          setResourceFromModal(callingformobjectid, form.formobject.id, resourceURI,form.formobject.defaulturi, inputID, form.formobject.store);
         }
       });
       $('#bfeditor-modalSave-' + form.formobject.id).attr('tabindex', tabIndices++);
@@ -2906,7 +2903,8 @@ bfe.define('src/bfe', ['require', 'exports', 'src/bfestore', 'src/bfelogging', '
   
         var data = form.formobject.store;
   
-        setResourceFromModal(callingformobjectid, form.formobject.id, resourceURI, inputID, data);
+        //setResourceFromModal(callingformobjectid, form.formobject.id, resourceURI, inputID, data);
+        setResourceFromModal(callingformobjectid, form.formobject.id, resourceURI, form.formobject.defaulturi, inputID, data);
       });
       $('#bfeditor-modal-' + form.formobject.id).on('hide.bs.modal', function () {
         $(this).empty();
@@ -2922,7 +2920,7 @@ bfe.define('src/bfe', ['require', 'exports', 'src/bfestore', 'src/bfelogging', '
       });
     }
   
-    function setResourceFromModal (formobjectID, modalformid, resourceID, propertyguid, data) {
+    function setResourceFromModal (formobjectID, modalformid, resourceID, resourceSubject, propertyguid, data) {
       /*
           console.log("Setting resource from modal");
           console.log("guid of has oether edition: " + forms[0].resourceTemplates[0].propertyTemplates[13].guid);
@@ -2945,7 +2943,7 @@ bfe.define('src/bfe', ['require', 'exports', 'src/bfestore', 'src/bfelogging', '
   
       // add the resourceType for the form
       var resourceType = { 'guid': guid(),
-        's': resourceID,
+        's': resourceSubject,
         'otype': 'uri',
         'p': 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type',
         'o': resourceURI
@@ -3038,6 +3036,7 @@ bfe.define('src/bfe', ['require', 'exports', 'src/bfestore', 'src/bfelogging', '
             'tlabelURI': displayuri,
             'fobjectid': formobjectID,
             'inputid': propertyguid,
+            'editable': properties[0].valueConstraint.editable,
             'triples': data
           };
           var $buttongroup = editDeleteButtonGroup(bgvars);
@@ -3090,7 +3089,7 @@ bfe.define('src/bfe', ['require', 'exports', 'src/bfestore', 'src/bfelogging', '
       }
       $buttongroup.append($displaybutton);
   
-      if (bgvars.editable === undefined || bgvars.editable === true) {
+      if (bgvars.editable === undefined || bgvars.editable === "true" || bgvars.editable === true) {
         // var $editbutton = $('<button type="button" class="btn btn-warning">e</button>');
         var $editbutton = $('<button class="btn btn-warning" type="button"> <span class="glyphicon glyphicon-pencil"></span></button>');
         $editbutton.click(function () {
@@ -3438,6 +3437,7 @@ bfe.define('src/bfe', ['require', 'exports', 'src/bfestore', 'src/bfelogging', '
   
                 if (replaceBnode) {
                   resourceTriple.o = t.o;
+                  formobject.defaulturi = t.o;
                   // find the bnode
                   bfestore.addTriple(resourceTriple);
                   formobject.store.push(resourceTriple);
